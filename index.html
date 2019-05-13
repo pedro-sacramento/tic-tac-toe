@@ -1,0 +1,260 @@
+<html>
+<head>
+<script src="jquery-3.2.1.js"></script>
+<style>
+table {
+	margin: auto;
+	background-color: black;
+}
+
+.x-click::after { content: "x"; color: red; }
+
+.o-click::after { content: "o"; color: blue; }
+
+.cell {
+	cursor: pointer;
+	width: 100px;
+	height: 100px;
+	background-color: white;
+	text-align: center;
+	font-size: 4em;
+	font-family: sans-serif;
+}
+
+body {
+	text-align: center;
+}
+</style>
+</head>
+<body>
+<h1 class="message">&nbsp;</h1>
+<table>
+	<tr>
+		<td class="cell" data-id="0"></td>
+		<td class="cell" data-id="1"></td>
+		<td class="cell" data-id="2"></td>
+	</tr>
+	<tr>
+		<td class="cell" data-id="3"></td>
+		<td class="cell" data-id="4"></td>
+		<td class="cell" data-id="5"></td>
+	</tr>	
+	<tr>
+		<td class="cell" data-id="6"></td>
+		<td class="cell" data-id="7"></td>
+		<td class="cell" data-id="8"></td>
+	</tr>	
+</table>
+<button class="restart">Restart</button>
+<script>
+var game =  [
+	'','','',
+	'','','',
+	'','',''
+];
+
+function isWin(cells) {
+	if (
+		// Rows
+		(cells[0] == cells[1] && cells[1] == cells[2] && cells[2] != '')
+		|| 
+		(cells[3] == cells[4] && cells[4] == cells[5] && cells[5] != '')
+		|| 
+		(cells[6] == cells[7] && cells[7] == cells[8] && cells[8] != '')
+		|| 
+		// Columns
+		(cells[0] == cells[3] && cells[3] == cells[6] && cells[6] != '')
+		|| 
+		(cells[1] == cells[4] && cells[4] == cells[7] && cells[7] != '')
+		|| 
+		(cells[2] == cells[5] && cells[5] == cells[8] && cells[8] != '')
+		|| 
+		// Diagonals
+		(cells[0] == cells[4] && cells[4] == cells[8] && cells[8] != '')
+		|| 
+		(cells[2] == cells[4] && cells[4] == cells[6] && cells[6] != '')
+	)
+		return true;
+	else
+		return false;
+}
+
+function getDepth(g) {
+	var depth = 0;
+	for (var i = 0 ; i < 9 ; i++) {
+		if (g[i] != '') depth++;
+	}
+	return depth;
+}
+
+function currentPlayer(g) { var depth = getDepth(g); return (depth%2 == 0)?'x':'o'; }
+
+function minOrMax(g) { var depth = getDepth(g); return (depth%2 == 0)?'max':'min'; }
+
+// Evaluates whether or not there's a win
+// "depth%2 == 0" means: it's "x" turn
+// -1 = "o" was the last player and won
+// +1 = "x" was the last player and won
+function getScore(g) { var depth = getDepth(g); return ((depth%2 == 0)?-1:1)*Math.abs(10-depth); }
+
+function possibleMoves(g) {
+	var player = currentPlayer(g);
+	var child = emptyTotal(g);
+	var result = [];
+	for (i = 0 ; i < child ; i++) {
+		result.push(makeState(g, player, i));
+	}
+	return result;
+}
+
+function emptyTotal(g) { var depth = getDepth(g); return 9 - depth; }
+
+function isTie(g) { return (emptyTotal(g) == 0); }
+
+function gameOver(g) { return (isWin(g) || isTie(g)); }
+
+// Starts with x (+1)
+function minimax(g) {
+	// Win
+	if (isWin(g)) return getScore(g);
+	// Tie
+	if (isTie(g)) return 0;	
+
+	// Creates possible moves
+	var moves = possibleMoves(g);
+
+	// Returns the score for the best move
+	return bestScore(g, moves);
+}
+
+function makeState(g, player, n) {
+	var g = JSON.parse(JSON.stringify(g));
+	var count = 0;
+	for (var i = 0 ; i < g.length ; i++) {
+		if (g[i] == '') {
+			if (count == n) {
+				g[i] = player;
+				break;
+			}
+			count++;			
+		}
+	}
+	return g;
+}
+
+function bestScore(g, moves) {
+	var result = new Array();	
+	var best;
+	var i;
+	for (i = 0 ; i < moves.length ; i++) {
+		result[i] = minimax(moves[i]);
+
+		if (i == 0)
+			best = result[i];
+		else
+			best = Math[minOrMax(g)](best, result[i]);
+	}
+	return best;
+}
+
+function betterMove(g, score, bestScore){
+	var minMax = minOrMax(g);
+	if (minMax == 'max')
+		return score > bestScore;
+	else
+		return score < bestScore;
+}
+
+function getBestMove(g, moves) {
+	var minMax = minOrMax(g);
+	var bestMove, bestScore, score;
+
+	for (var i = 0 ; i < moves.length ; i++) {
+		score = minimax(moves[i]);		
+		if (i == 0 || betterMove(g, score, bestScore)) {
+			bestScore = score;
+			bestMove = moves[i];
+		}
+	}
+
+	return bestMove;
+}
+
+function playAI(g) {
+	var moves = possibleMoves(g);
+
+	var data = '';
+	var n;
+
+	return getBestMove(g, moves);
+}
+
+function render(game) {
+	$('*[data-id]')
+		.removeClass('x-click')
+		.removeClass('o-click');
+
+	for (var i = 0 ; i < 9 ; i++) {
+		if (game[i] != '') {
+			$('*[data-id='+i+']').addClass(game[i]+'-click');		
+		}
+	}
+}
+
+function humanTurn(id) {
+	// 
+	if (currentPlayer(game) == 'o') return;
+
+	//
+	if (!gameOver(game) && game[id] == '') {
+		game[id] = currentPlayer(game);
+		render(game);
+		message();
+	}
+}
+
+function aiTurn() {
+	// 
+	if (currentPlayer(game) == 'x') return;
+
+	//
+	game = playAI(game);
+	render(game);
+	message();
+}
+
+function restart() { game = [ '','','', '','','', '','','' ]; render(game); message(); }
+
+function message() {
+	var msg = '&nbsp;';
+
+	if (gameOver(game)) {
+		if (isWin(game))
+			msg = (currentPlayer(game) == 'x')?'Computer wins!':'Human wins!';
+		else
+		if (isTie(game))
+			msg = 'It\'s a draw!';
+	}
+
+	$('.message').html(msg);
+}
+
+// Clickable cells
+$('.cell').click(function () {
+	// *** Human turn *** //
+	if (!gameOver(game)) {
+		humanTurn(
+			parseInt( $(this).data('id') )
+		);
+	}
+
+	// *** AI plays *** //
+	if (!gameOver(game))
+		aiTurn();
+});
+
+// Clickable restart button
+$('.restart').click(function () { restart(); })
+</script>
+</body>
+</html>
